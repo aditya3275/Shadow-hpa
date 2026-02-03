@@ -10,6 +10,7 @@ cost and reliability trade-offs before touching production.
 import argparse
 import sys
 import pandas as pd
+import matplotlib.pyplot as plt
 from hpa.spec import HPASpec
 from hpa.simulator import simulate_hpa
 from metrics.loader import load_cpu_metrics
@@ -18,6 +19,7 @@ from hpa.regret import (
     calculate_wasted_resources, 
     calculate_under_provisioning_risk
 )
+from visualize.plot import plot_simulation_results
 
 def main():
     parser = argparse.ArgumentParser(description="Shadow HPA Simulator CLI")
@@ -27,6 +29,7 @@ def main():
     parser.add_argument("--max-replicas", type=int, default=10, help="Maximum replicas (default: 10)")
     parser.add_argument("--target", type=int, required=True, help="Target CPU utilization percentage")
     parser.add_argument("--scale-down-window", type=int, default=300, help="Scale-down stabilization window in seconds (default: 300)")
+    parser.add_argument("--plot", action="store_true", help="Display simulation plot")
     
     args = parser.parse_args()
     
@@ -53,7 +56,6 @@ def main():
             waste_val = calculate_wasted_resources(metrics, results)
             waste = f"{waste_val:.2f} replica-minutes"
         
-
         # The CLI intentionally outputs human-readable summaries
         # so engineers can reason about scaling behavior quickly.
 
@@ -63,9 +65,25 @@ def main():
         print(f"Scale-Up Regret (Waste):   {waste}")
         print("=====================================")
         
-        # Optional: Save results? 
-        # For now just stdout summary.
-        
+        if args.plot:
+            print("Displaying plot...")
+            # plot_simulation_results expects a merged dataframe or similar?
+            # It expects 'timestamp', 'cpu_utilization', 'simulated_replicas'.
+            # simulate_hpa returns ['timestamp', 'simulated_replicas'].
+            # We need to merge CPU utilization back in for the plot to work.
+            
+            # Merge results with metrics on timestamp
+            # Use merge_asof or simple merge if timestamps align. 
+            # simulate_hpa outputs row-for-row with input metrics, so simple assignment works if sorted.
+            
+            plot_df = results.copy()
+            # Assuming metrics and results differ only by added columns and are aligned.
+            # Safer to merge.
+            plot_df = pd.merge(plot_df, metrics[['timestamp', 'cpu_utilization']], on='timestamp', how='left')
+            
+            plot_simulation_results(plot_df)
+            plt.show()
+
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
