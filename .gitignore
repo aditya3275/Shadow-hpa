@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+.venv/
+venv/
+
+# Local data outputs (optional)
+*.log
+
+# OS junk
+.DS_Store
+
