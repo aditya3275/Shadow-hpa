@@ -1,0 +1,89 @@
+aditya3275
+git remote add origin https://github.com/aditya3275/shadow-hpa.git
+git branch -M main
+git push -u origin main
+
+py testing 
+$ python3 -m pytest
+
+for visualisation
+python3 main.py \
+  --csv data/sample_cpu.csv \
+  --target 70 \
+  --plot
+
+
+When asked:
+
+“Why do you have __init__.py files?”
+
+You say:
+
+“I wanted clean package boundaries so the simulator logic, metrics ingestion, and visualization layers are properly modular and testable.”
+
+That’s a grown-engineer answer.
+
+If an interviewer asks:
+
+“Why did you make the HPA spec immutable?”
+
+You say:
+
+“Because autoscaling behavior must be deterministic when replaying historical metrics. Mutable policy would make simulations non-reproducible.”
+
+That answer alone puts you ahead.
+
+If asked:
+
+“Why did you start with CSV instead of Prometheus?”
+
+You say:
+
+“I wanted to decouple simulation correctness from data source complexity. Once the replay engine is correct, Prometheus is just another ingestion layer.”
+
+If asked:
+
+“Why didn’t you implement stabilization here?”
+
+You answer:
+
+“I intentionally separated replica math from stabilization logic so each component can be reasoned about and tested independently.”
+
+“Why does HPA sometimes refuse to scale down even when CPU drops?”
+
+Your answer:
+
+“Because Kubernetes applies a rolling stabilization window that blocks scale-down if any recent desired replica count indicates higher capacity. I modeled this explicitly in my Shadow HPA simulator.
+
+If asked:
+
+“How did you validate your simulator matches Kubernetes?”
+
+You say:
+
+“I wrote deterministic unit tests that encode real HPA edge cases, especially around stabilization windows and transient load drops.”
+
+If asked:
+
+“What’s unique about your project?”
+
+You say:
+
+“Most autoscaling tools tell you what happened. Shadow HPA tells you what it cost and what risk it introduced, using regret metrics.”
+
+If asked:
+
+“How do I try your project?”
+
+You say:
+
+“You can run it locally with a single CLI command and replay historical CPU data through a simulated HPA.”
+
+
+If asked:
+
+“How do you explain HPA behavior to someone new?”
+
+You answer:
+
+“I overlay CPU utilization and replica count on the same timeline so scaling behavior becomes visually obvious.”
