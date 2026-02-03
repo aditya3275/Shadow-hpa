@@ -5,18 +5,10 @@ This module replicates the Kubernetes HPA scaling algorithm in a deterministic,
 side-effect-free manner, suitable for historical metrics replay.
 """
 
-"""
-This module implements the core Kubernetes HPA replica calculation
-in 'shadow mode' by replaying historical CPU metrics.
-
-Stabilization logic is intentionally excluded here to keep the
-control math isolated and testable.
-"""
-
-
 import pandas as pd
 import math
 from hpa.spec import HPASpec
+from hpa.stabilization import StabilizationWindow
 
 def simulate_hpa(metrics_df: pd.DataFrame, spec: HPASpec) -> pd.DataFrame:
     """
@@ -34,6 +26,7 @@ def simulate_hpa(metrics_df: pd.DataFrame, spec: HPASpec) -> pd.DataFrame:
     """
     results = []
     current_replicas = spec.min_replicas
+    stabilizer = StabilizationWindow()
     
     for _, row in metrics_df.iterrows():
         timestamp = row['timestamp']
@@ -44,25 +37,36 @@ def simulate_hpa(metrics_df: pd.DataFrame, spec: HPASpec) -> pd.DataFrame:
         ratio = current_cpu / spec.target_utilization
         
         # 2. Apply tolerance
-        # If the ratio is within tolerance, we keep the current replicas.
-        # Kubernetes uses: if abs(1 - ratio) <= tolerance, then ratio = 1
         if abs(1 - ratio) <= spec.tolerance:
-            desired_replicas = current_replicas
+            raw_desired = current_replicas
         else:
-            desired_replicas = math.ceil(current_replicas * ratio)
-
-         # Kubernetes ignores minor metric fluctuations within tolerance to avoid unnecessary scaling events.   
-        # 3. Enforce min/max replicas
-        desired_replicas = max(spec.min_replicas, min(spec.max_replicas, desired_replicas))
+            raw_desired = math.ceil(current_replicas * ratio)
+            
+        # 3. Enforce min/max replicas on the raw calculation
+        raw_desired = max(spec.min_replicas, min(spec.max_replicas, raw_desired))
         
+        # 4. Record recommendation for stabilization
+        stabilizer.record_recommendation(timestamp, raw_desired)
+        
+        # 5. Determine final decision
+        if raw_desired > current_replicas:
+            # Scale Up: Immediate (skip stabilization for this version)
+            desired_replicas = raw_desired
+        else:
+            # Scale Down: Stabilized
+            stabilized_recommendation = stabilizer.get_stabilized_recommendation(
+                timestamp, spec.scale_down_stabilization_window_seconds
+            )
+            # We can only scale down to the stabilized recommendation
+            # (which is the max of recent recommendations)
+            desired_replicas = min(current_replicas, stabilized_recommendation)
+            
         # Record results
         results.append({
             'timestamp': timestamp,
             'simulated_replicas': desired_replicas
         })
         
-        # For this version (no stabilization), the next step's current_replicas 
-        # is the current step's desired_replicas.
         current_replicas = desired_replicas
         
     return pd.DataFrame(results)
